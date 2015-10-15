@@ -6,45 +6,60 @@ import (
 	"fmt"
 	"net/http"
 
-	amzaws "launchpad.net/goamz/aws"
-	amzs3 "launchpad.net/goamz/s3"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/service/s3"
 )
 
-func New(config Config) (S3Client, error) {
-	awsAuth := amzaws.Auth{
-		AccessKey: config.AccessKeyID,
-		SecretKey: config.SecretAccessKey,
+type BlobstoreClient struct {
+	s3Client *s3.S3
+}
+
+var errorKeyMissing = errors.New("BlobstoreClient: access_key_id or secret_access_key is missing")
+var errorKeysPresent = errors.New("BlobstoreClient: Can't use access_key_id and secret_access_key with env_or_profile credentials_source")
+
+func New(config Config) (*BlobstoreClient, error) {
+	transport := *http.DefaultTransport.(*http.Transport)
+	transport.TLSClientConfig = &tls.Config{
+		InsecureSkipVerify: !config.SSLVerifyPeer,
 	}
+
+	httpClient := &http.Client{Transport: &transport}
+
+	s3Config := aws.NewConfig().
+		WithRegion(config.Region).
+		WithS3ForcePathStyle(true).
+		// 	// WithEndpoint(config.s3Endpoint()).
+		// 	WithLogLevel(aws.LogDebugWithSigning).
+		// 	WithDisableSSL(config.UseSSL).
+		WithHTTPClient(httpClient)
 
 	switch config.CredentialsSource {
 	case "static":
 		if config.AccessKeyID == "" || config.SecretAccessKey == "" {
-			return nil, errors.New("access_key_id or secret_access_key is missing")
+			return nil, errorKeyMissing
 		}
+
+		creds := credentials.NewStaticCredentials(config.AccessKeyID, config.SecretAccessKey, "")
+		s3Config = s3Config.WithCredentials(creds)
 	case "env_or_profile":
-		if config.AccessKeyID == "" && config.SecretAccessKey == "" {
-			auth, err := amzaws.GetAuth()
-			if err != nil {
-				return nil, err
-			}
-			awsAuth = amzaws.NewAuth(auth.AccessKey, auth.SecretKey, auth.Token(), auth.Expiration())
-		} else {
-			return nil, errors.New("Can't use access_key_id and secret_access_key with env_or_profile credentials_source")
+		if config.AccessKeyID != "" || config.SecretAccessKey != "" {
+			return nil, errorKeysPresent
 		}
 	default:
 		return nil, fmt.Errorf("Incorrect credentials_source: %s", config.CredentialsSource)
 	}
 
-	s3 := amzs3.New(awsAuth, config.AWSRegion())
+	s3Client := s3.New(s3Config)
 
-	transport := &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: !config.SSLVerifyPeer,
-		},
-	}
+	// switch config.Region {
+	// case "eu-central-1":
+	// 	// use v4 signing
+	// case "cn-north-1":
+	// 	// use v4 signing
+	// default:
+	// 	setv2Handlers(s3Client)
+	// }
 
-	http.DefaultClient.Transport = transport
-
-	return s3.Bucket(config.BucketName), nil
+	return &BlobstoreClient{s3Client: s3Client}, nil
 }
