@@ -58,8 +58,10 @@
   current_config_file=${S3CLI_CONFIG_FILE}
   run_local_or_remote "${S3CLI_EXE} -c ${S3CLI_CONFIG_FILE} delete ${s3_filename}"
 
-  s3cmd --config ${S3CMD_CONFIG_FILE} get s3://${bucket_name}/${s3_filename} uploaded_by_s3 --force
-
   [ "${status}" -eq 0 ]
-  [[ "${output}" =~ "404 (Not Found)" ]]
+
+  run s3cmd --config ${S3CMD_CONFIG_FILE} get s3://${bucket_name}/${s3_filename} uploaded_by_s3 --force
+
+  [ "${status}" -eq 1 ]
+  [[ "${output}" = "ERROR: S3 error: 404 (Not Found)" ]]
 }
