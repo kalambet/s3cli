@@ -62,3 +62,13 @@
 
   [ "${status}" -eq 12 ]
 }
+
+@test "Invoking s3cli delete on non existing file should not return an error using config: ${S3CLI_CONFIG_FILE}" {
+  local expected_string=${BATS_RANDOM_ID}
+  local s3_filename="non_existing_file_in_s3"
+
+  current_config_file=${S3CLI_CONFIG_FILE}
+  run_local_or_remote "${S3CLI_EXE} -c ${S3CLI_CONFIG_FILE} delete ${s3_filename}"
+
+  [ "${status}" -eq 0 ]
+}
