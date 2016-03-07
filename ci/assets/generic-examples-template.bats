@@ -60,5 +60,6 @@
 
   s3cmd --config ${S3CMD_CONFIG_FILE} get s3://${bucket_name}/${s3_filename} uploaded_by_s3 --force
 
-  [ "${status}" -eq 1 ]
+  [ "${status}" -eq 0 ]
+  [[ "${output}" =~ "404 (Not Found)" ]]
 }
