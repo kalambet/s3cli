@@ -60,8 +60,8 @@
 
   [ "${status}" -eq 0 ]
 
-  run s3cmd --config ${S3CMD_CONFIG_FILE} get s3://${bucket_name}/${s3_filename} uploaded_by_s3 --force
+  s3cmd --config ${S3CMD_CONFIG_FILE} get s3://${bucket_name}/${s3_filename} uploaded_by_s3 --force
 
-  [ "${status}" -eq 1 ]
-  [[ "${output}" = "ERROR: S3 error: 404 (Not Found)" ]]
+  [ "${status}" -eq 0 ]
+  [[ "${lines[0]}" = "ERROR: S3 error: 404 (Not Found)" ]]
 }
